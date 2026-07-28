@@ -45,14 +45,25 @@
    market/event data, ingestion metadata, price snapshots, user accounts
    (via Supabase Auth), watchlists, and AI analysis cache. Row Level
    Security (RLS) enforces per-user data isolation.
-4. **Ingestion service.** A scheduled, idempotent sync job that pulls
-   markets/events from Polymarket's Gamma API and price history from the
-   CLOB API, upserting into Postgres. Decoupled from user request/response
-   cycles so the dashboard is never blocked on an upstream API call.
-5. **AI reasoning layer.** Server-side calls to the Claude API, given
+4. **Background jobs (Phase 1.5).** Three scheduled, idempotent jobs —
+   `sync-markets`, `refresh-order-books`, `archive-markets` — pull from
+   Polymarket's Gamma/CLOB APIs and upsert into Postgres, each with its own
+   run record, retry/backoff, and per-item partial failure recovery. See
+   `docs/10-data-pipeline.md`. Decoupled from user request/response cycles
+   so the dashboard is never blocked on an upstream API call.
+5. **Service layer (Phase 1.5).** `lib/services/*` is where every layer
+   above actually touches data — markets/events/categories, price history,
+   order books, sync orchestration, data quality, market stats. Each
+   service takes its Supabase client as a parameter instead of constructing
+   one, so it's independently unit-testable without a live database or
+   request context (see `docs/05-api-integration.md` § 5.7). Route handlers
+   and Server Components are thin callers of this layer, not where business
+   logic lives.
+6. **AI reasoning layer.** Server-side calls to the Claude API, given
    normalized market + price + (future) news context, producing structured,
-   cached "signal" output. Phase 1 ships the plumbing (a single
-   market-analysis endpoint) but not a full research pipeline.
+   cached "signal" output. Phase 1 shipped the plumbing (a single
+   market-analysis endpoint); Phase 1.5 deliberately left this layer
+   untouched to focus on data-pipeline reliability first.
 
 ## Why RSC + a separate ingestion job (not client-side polling Polymarket)
 
@@ -78,3 +89,9 @@ markets, fetch CLOB `/prices-history` → insert into `price_snapshots`.
 /api/markets/[id]/analyze` → server loads market + recent price snapshots
 from Supabase → calls Claude API with a structured prompt → stores result in
 `ai_analyses` (cached, keyed by market + content hash) → returns to client.
+
+**Pipeline health check (Phase 1.5, on-demand, signed-in user):** Browser →
+`/admin/health` Server Component → in parallel, `lib/services/cron-status`,
+`database-health`, `data-quality`, `sync-runs`, and `market-stats` each query
+Supabase directly (no Polymarket calls in this path) → rendered as cron
+status, data-quality warnings, error history, and market metrics.

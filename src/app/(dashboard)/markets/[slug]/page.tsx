@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
 import { getMarketBySlug } from "@/lib/queries/markets";
 import { createClient } from "@/lib/supabase/server";
-import { fetchPriceHistory } from "@/lib/polymarket/clob";
+import { getMarketPriceSeries } from "@/lib/services/charts.service";
 import { formatCompactUsd, formatSignedPercent, cn } from "@/lib/utils";
 import { ProbabilityPill } from "@/components/markets/probability-pill";
 import { PriceChart } from "@/components/markets/price-chart";
@@ -28,14 +28,13 @@ export default async function MarketDetailPage({ params }: MarketDetailPageProps
   const market = await getMarketBySlug(slug);
   if (!market) notFound();
 
-  const tokenId = market.clob_token_ids?.[0];
-  const initialHistory = tokenId ? await fetchPriceHistory({ tokenId, interval: "1w" }) : [];
-  const initialPoints = initialHistory.map((p) => ({ time: p.t, value: p.p }));
-
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const tokenId = market.clob_token_ids?.[0];
+  const initialPoints = tokenId ? await getMarketPriceSeries(supabase, market.id, tokenId, "7d") : [];
 
   const category = market.category_id ? getCategory(market.category_id) : undefined;
   const change = market.price_change_24h ?? 0;

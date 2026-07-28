@@ -9,15 +9,16 @@ import {
   type UTCTimestamp,
 } from "lightweight-charts";
 import { cn } from "@/lib/utils";
+import type { HistoryRange } from "@/lib/services/price-history.service";
 
-const RANGES = [
-  { label: "1D", interval: "1h" },
-  { label: "1W", interval: "1w" },
-  { label: "1M", interval: "1m" },
-  { label: "ALL", interval: "max" },
-] as const;
-
-type RangeInterval = (typeof RANGES)[number]["interval"];
+const RANGES: { label: string; range: HistoryRange }[] = [
+  { label: "1H", range: "1h" },
+  { label: "6H", range: "6h" },
+  { label: "24H", range: "24h" },
+  { label: "7D", range: "7d" },
+  { label: "30D", range: "30d" },
+  { label: "ALL", range: "all" },
+];
 
 interface PricePoint {
   time: number;
@@ -28,7 +29,7 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
-  const [range, setRange] = useState<RangeInterval>("1w");
+  const [range, setRange] = useState<HistoryRange>("7d");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -78,11 +79,11 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
     chartRef.current?.timeScale().fitContent();
   }, [initialPoints]);
 
-  async function handleRangeChange(interval: RangeInterval) {
-    setRange(interval);
+  async function handleRangeChange(nextRange: HistoryRange) {
+    setRange(nextRange);
     setLoading(true);
     try {
-      const res = await fetch(`/api/markets/${marketId}/price-history?interval=${interval}`);
+      const res = await fetch(`/api/markets/${marketId}/price-history?range=${nextRange}`);
       const json = await res.json();
       const points: PricePoint[] = json.points ?? [];
       seriesRef.current?.setData(points.map((p) => ({ time: p.time as UTCTimestamp, value: p.value })));
@@ -98,11 +99,11 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
         <div className="flex gap-1">
           {RANGES.map((r) => (
             <button
-              key={r.interval}
-              onClick={() => handleRangeChange(r.interval)}
+              key={r.range}
+              onClick={() => handleRangeChange(r.range)}
               className={cn(
                 "rounded-md px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:bg-surface-hover",
-                range === r.interval && "bg-surface-hover text-foreground",
+                range === r.range && "bg-surface-hover text-foreground",
               )}
             >
               {r.label}

@@ -63,7 +63,11 @@ export interface Database {
           price_change_24h: number | null;
           active: boolean;
           closed: boolean;
+          archived: boolean;
           resolved_outcome: string | null;
+          resolved_at: string | null;
+          mid_price: number | null;
+          spread: number | null;
           end_date: string | null;
           raw: Json | null;
           last_synced_at: string | null;
@@ -97,16 +101,40 @@ export interface Database {
       ingestion_runs: {
         Row: {
           id: number;
+          job_name: string;
           started_at: string;
           finished_at: string | null;
           status: "running" | "success" | "partial" | "failed";
           events_upserted: number;
           markets_upserted: number;
           snapshots_inserted: number;
+          markets_archived: number;
+          order_books_refreshed: number;
+          markets_failed: number;
+          duration_ms: number | null;
           error: string | null;
         };
         Insert: Partial<Database["public"]["Tables"]["ingestion_runs"]["Row"]>;
         Update: Partial<Database["public"]["Tables"]["ingestion_runs"]["Row"]>;
+        Relationships: [];
+      };
+      sync_failures: {
+        Row: {
+          id: number;
+          run_id: number | null;
+          job_name: string;
+          market_id: string | null;
+          event_id: string | null;
+          stage: string;
+          error: string;
+          occurred_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["sync_failures"]["Row"]> & {
+          job_name: string;
+          stage: string;
+          error: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["sync_failures"]["Row"]>;
         Relationships: [];
       };
       profiles: {
@@ -171,3 +199,5 @@ export type Event = Database["public"]["Tables"]["events"]["Row"];
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 export type PriceSnapshot = Database["public"]["Tables"]["price_snapshots"]["Row"];
 export type AiAnalysis = Database["public"]["Tables"]["ai_analyses"]["Row"];
+export type IngestionRun = Database["public"]["Tables"]["ingestion_runs"]["Row"];
+export type SyncFailure = Database["public"]["Tables"]["sync_failures"]["Row"];

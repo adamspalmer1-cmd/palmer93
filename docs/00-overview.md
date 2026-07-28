@@ -17,6 +17,16 @@ before writing any Phase 1 code, as requested:
 7. [Security Considerations](./07-security.md)
 8. [UI Wireframes](./08-wireframes.md)
 9. [Development Roadmap](./09-roadmap.md)
+10. [Data Pipeline Reference](./10-data-pipeline.md) — added in Phase 1.5;
+    documents every background job and synchronization process in detail.
+
+**Phase 1.5** (data integrity & intelligence hardening) built on this
+foundation without starting the AI Opportunity Engine: order-book refresh,
+archival, partial-failure-recovering sync jobs, retry/backoff, a
+`/admin/health` dashboard, data-quality validation, and a reusable,
+independently-testable service layer. See `10-data-pipeline.md` and the
+"Phase 1.5" notes throughout `04-database-schema.md`, `05-api-integration.md`,
+and `07-security.md`.
 
 ## Polymarket API research summary (current, as of July 2026)
 

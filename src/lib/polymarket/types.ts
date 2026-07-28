@@ -81,3 +81,17 @@ export const clobPricesHistorySchema = z.object({
 });
 
 export type ClobPricePoint = z.infer<typeof clobPricePointSchema>;
+
+const clobBookLevelSchema = z.object({
+  price: z.union([z.string(), z.number()]),
+  size: z.union([z.string(), z.number()]).optional(),
+});
+
+export const clobOrderBookSchema = z.object({
+  market: z.string().optional(),
+  asset_id: z.string().optional(),
+  bids: z.array(clobBookLevelSchema).default([]),
+  asks: z.array(clobBookLevelSchema).default([]),
+});
+
+export type ClobOrderBook = z.infer<typeof clobOrderBookSchema>;

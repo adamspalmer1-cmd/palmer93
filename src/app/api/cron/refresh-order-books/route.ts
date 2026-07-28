@@ -1,16 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCronAuthorized } from "@/lib/sync/cron-auth";
-import { runFullSync } from "@/lib/services/sync.service";
+import { refreshOrderBooks } from "@/lib/services/sync.service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const BATCH_SIZE = 25;
+
 /**
- * Full-sync entrypoint: runs sync-markets, refresh-order-books, and
- * archive-markets in sequence. Kept for backward compatibility and for
- * manually triggering a complete sync; each step is also independently
- * schedulable via `/api/cron/*` — see docs/10-data-pipeline.md.
+ * Refreshes best bid/ask/mid/spread from the live CLOB order book for the
+ * highest-volume active markets, and records a deduplicated price
+ * snapshot. See docs/10-data-pipeline.md § refresh-order-books.
  */
 async function handle(request: NextRequest) {
   if (!isCronAuthorized(request)) {
@@ -18,10 +19,10 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const result = await runFullSync(createAdminClient());
-    return NextResponse.json({ status: "success", ...result });
+    const result = await refreshOrderBooks(createAdminClient(), BATCH_SIZE);
+    return NextResponse.json({ status: result.failed > 0 ? "partial" : "success", ...result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown ingestion error";
+    const message = error instanceof Error ? error.message : "Unknown refresh-order-books error";
     return NextResponse.json({ status: "failed", error: message }, { status: 500 });
   }
 }

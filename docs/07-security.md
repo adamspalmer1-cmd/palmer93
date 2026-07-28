@@ -22,12 +22,24 @@
   they're public research data, but writes are restricted to the
   service-role key (i.e., no `insert`/`update`/`delete` policy for
   `anon`/`authenticated` — only the service role, which bypasses RLS,
-  performs writes from the ingestion job).
+  performs writes from the sync jobs).
 - `profiles`, `watchlist_items` are scoped with `using (auth.uid() = user_id)`
   (or `= id` for profiles) for both read and write.
 - `ai_analyses` is public-read (it's research output tied to a public
   market) but service-role-only write (written by the trusted API route
   after validating Claude's output, not directly by the client).
+- **Phase 1.5 RLS tightening:** `ingestion_runs` was public-read in Phase 1;
+  it's now restricted to `using (auth.uid() is not null)` (any signed-in
+  user), since sync run metadata and error messages are operational data,
+  not research data, and shouldn't be exposed to anonymous visitors.
+  `sync_failures` (new) uses the same signed-in-only read policy. Both
+  remain service-role-only for writes.
+- **Admin surface has no role system yet.** The `/admin/health` dashboard
+  (Phase 1.5) is gated only by "is signed in", the same as `ingestion_runs`/
+  `sync_failures` RLS — Phase 1's authentication doc explicitly scoped out
+  an admin/role system, and Phase 1.5 doesn't add one. Any authenticated
+  user can currently view pipeline health and error history. Restricting
+  this to a real admin role is a near-term hardening item (roadmap).
 
 ## Input validation
 
@@ -58,9 +70,11 @@
   content hash (`ai_analyses`), sharply limiting duplicate spend; a
   per-user/hour rate limit is called out as a near-term hardening item
   (roadmap, Phase 2) once real usage patterns are known.
-- The ingestion endpoint is not publicly invokable (shared-secret header),
-  preventing third parties from triggering excess Polymarket API load or
-  Supabase writes on our behalf.
+- Every ingestion/cron endpoint (`/api/ingest/markets` and the three
+  `/api/cron/*` routes) shares the same `CRON_SECRET`-gated authorization
+  check (`lib/sync/cron-auth.ts`) and is not publicly invokable, preventing
+  third parties from triggering excess Polymarket API load or Supabase
+  writes on our behalf.
 
 ## Transport & headers
 
@@ -77,6 +91,24 @@
   needs L1/L2 Polymarket trading credentials, which removes an entire class
   of key-management risk that a trading bot would otherwise carry.
 - No execution of trades on the user's behalf, ever.
+
+## Database review (Phase 1.5)
+
+- **Foreign keys reviewed, no changes needed.** `markets.event_id ->
+  events.id` (`on delete cascade`), `price_snapshots.market_id ->
+  markets.id` (`cascade`), `watchlist_items.market_id`/`ai_analyses.market_id
+  -> markets.id` (`cascade`), and the new `sync_failures.market_id`/`event_id`
+  (`on delete set null`, so a failure record survives the market/event
+  it referenced being deleted) all already had correct, intentional
+  `on delete` behavior. This also means "broken event links" — a market
+  pointing at a nonexistent event — cannot occur through normal writes; the
+  data-quality check for it exists as a defensive, cheap canary rather than
+  a check expected to ever fire (see `lib/services/data-quality.service.ts`).
+- **Query performance reviewed.** The indexes added in migration
+  `0006_data_integrity.sql` target the queries introduced by the health
+  dashboard and background jobs specifically (staleness checks, archival
+  filters, per-job run history) rather than being added speculatively —
+  see `04-database-schema.md` for the full list.
 
 ## Dependency & platform hygiene
 

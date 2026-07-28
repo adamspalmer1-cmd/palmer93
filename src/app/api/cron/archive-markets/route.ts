@@ -1,16 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCronAuthorized } from "@/lib/sync/cron-auth";
-import { runFullSync } from "@/lib/services/sync.service";
+import { archiveMarkets } from "@/lib/services/sync.service";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 30;
+
+const GRACE_DAYS = 3;
 
 /**
- * Full-sync entrypoint: runs sync-markets, refresh-order-books, and
- * archive-markets in sequence. Kept for backward compatibility and for
- * manually triggering a complete sync; each step is also independently
- * schedulable via `/api/cron/*` — see docs/10-data-pipeline.md.
+ * Retires markets that have been closed for at least `GRACE_DAYS` from the
+ * active sync/order-book set. See docs/10-data-pipeline.md § archive-markets.
  */
 async function handle(request: NextRequest) {
   if (!isCronAuthorized(request)) {
@@ -18,10 +18,10 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const result = await runFullSync(createAdminClient());
+    const result = await archiveMarkets(createAdminClient(), GRACE_DAYS);
     return NextResponse.json({ status: "success", ...result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown ingestion error";
+    const message = error instanceof Error ? error.message : "Unknown archive-markets error";
     return NextResponse.json({ status: "failed", error: message }, { status: 500 });
   }
 }

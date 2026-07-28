@@ -6,6 +6,7 @@ import {
   Trophy,
   Banknote,
   Star,
+  Activity,
   type LucideIcon,
 } from "lucide-react";
 import type { NavItem } from "@/config/site";
@@ -18,6 +19,7 @@ const icons: Record<NavItem["icon"], LucideIcon> = {
   trophy: Trophy,
   banknote: Banknote,
   star: Star,
+  activity: Activity,
 };
 
 export function NavIcon({ name, className }: { name: NavItem["icon"]; className?: string }) {

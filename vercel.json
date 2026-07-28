@@ -1,8 +1,16 @@
 {
   "crons": [
     {
-      "path": "/api/ingest/markets",
+      "path": "/api/cron/sync-markets",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/refresh-order-books",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/archive-markets",
+      "schedule": "0 * * * *"
     }
   ]
 }

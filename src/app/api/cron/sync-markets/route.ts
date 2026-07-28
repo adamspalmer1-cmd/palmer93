@@ -1,16 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isCronAuthorized } from "@/lib/sync/cron-auth";
-import { runFullSync } from "@/lib/services/sync.service";
+import { syncMarkets } from "@/lib/services/sync.service";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Full-sync entrypoint: runs sync-markets, refresh-order-books, and
- * archive-markets in sequence. Kept for backward compatibility and for
- * manually triggering a complete sync; each step is also independently
- * schedulable via `/api/cron/*` — see docs/10-data-pipeline.md.
+ * Fetches active events/markets from Polymarket's Gamma API and upserts
+ * them into Supabase, one event at a time so a single bad event doesn't
+ * abort the batch. See docs/10-data-pipeline.md § sync-markets.
  */
 async function handle(request: NextRequest) {
   if (!isCronAuthorized(request)) {
@@ -18,10 +17,10 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const result = await runFullSync(createAdminClient());
-    return NextResponse.json({ status: "success", ...result });
+    const result = await syncMarkets(createAdminClient());
+    return NextResponse.json({ status: result.marketsFailed > 0 ? "partial" : "success", ...result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown ingestion error";
+    const message = error instanceof Error ? error.message : "Unknown sync-markets error";
     return NextResponse.json({ status: "failed", error: message }, { status: 500 });
   }
 }
