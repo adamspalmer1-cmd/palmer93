@@ -9,12 +9,13 @@ export const siteConfig = {
 export interface NavItem {
   label: string;
   href: string;
-  icon: "layout-dashboard" | "line-chart" | "landmark" | "bitcoin" | "trophy" | "banknote" | "star" | "activity";
+  icon: "layout-dashboard" | "line-chart" | "landmark" | "bitcoin" | "trophy" | "banknote" | "star" | "activity" | "radar";
 }
 
 export const dashboardNav: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: "layout-dashboard" },
   { label: "Markets", href: "/markets", icon: "line-chart" },
+  { label: "Opportunity Scanner", href: "/scanner", icon: "radar" },
   { label: "Politics", href: "/categories/politics", icon: "landmark" },
   { label: "Crypto", href: "/categories/crypto", icon: "bitcoin" },
   { label: "Sports", href: "/categories/sports", icon: "trophy" },
