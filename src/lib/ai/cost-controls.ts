@@ -38,6 +38,8 @@ export interface CostControlsConfig {
   maxSpreadDecimal: number;
   /** A market already analyzed within this many hours is not eligible for reanalysis (see lib/ai/reanalysis.ts). */
   reanalysisCooldownHours: number;
+  /** A market-probability move of at least this much (decimal) since the last analysis bypasses the cooldown. */
+  reanalysisPriceMoveOverride: number;
   /** Token/cost pricing used to estimate spend. */
   modelPricing: ModelPricing;
   /** Per-category overrides, merged on top of the fields above. Category keys match `categories.slug`. */
@@ -58,6 +60,7 @@ export const DEFAULT_COST_CONTROLS: CostControlsConfig = {
   minLiquidityUsd: 1_000,
   maxSpreadDecimal: 0.2,
   reanalysisCooldownHours: 12,
+  reanalysisPriceMoveOverride: 0.05,
   modelPricing: DEFAULT_MODEL_PRICING,
   categoryOverrides: {},
 };
@@ -76,6 +79,10 @@ export function loadCostControlsConfig(overrides: Partial<CostControlsConfig> = 
     minLiquidityUsd: envNumber("AI_MIN_LIQUIDITY_USD", DEFAULT_COST_CONTROLS.minLiquidityUsd),
     maxSpreadDecimal: envNumber("AI_MAX_SPREAD_DECIMAL", DEFAULT_COST_CONTROLS.maxSpreadDecimal),
     reanalysisCooldownHours: envNumber("AI_REANALYSIS_COOLDOWN_HOURS", DEFAULT_COST_CONTROLS.reanalysisCooldownHours),
+    reanalysisPriceMoveOverride: envNumber(
+      "AI_REANALYSIS_PRICE_MOVE_OVERRIDE",
+      DEFAULT_COST_CONTROLS.reanalysisPriceMoveOverride,
+    ),
     modelPricing: {
       inputPerMillionTokensUsd: envNumber(
         "ANTHROPIC_INPUT_COST_PER_MTOK",
