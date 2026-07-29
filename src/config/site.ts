@@ -9,7 +9,17 @@ export const siteConfig = {
 export interface NavItem {
   label: string;
   href: string;
-  icon: "layout-dashboard" | "line-chart" | "landmark" | "bitcoin" | "trophy" | "banknote" | "star" | "activity" | "radar";
+  icon:
+    | "layout-dashboard"
+    | "line-chart"
+    | "landmark"
+    | "bitcoin"
+    | "trophy"
+    | "banknote"
+    | "star"
+    | "activity"
+    | "radar"
+    | "brain-circuit";
 }
 
 export const dashboardNav: NavItem[] = [
@@ -22,4 +32,5 @@ export const dashboardNav: NavItem[] = [
   { label: "Economy", href: "/categories/economy", icon: "banknote" },
   { label: "Watchlist", href: "/watchlist", icon: "star" },
   { label: "Pipeline Health", href: "/admin/health", icon: "activity" },
+  { label: "AI Engine Ops", href: "/admin/ai-engine", icon: "brain-circuit" },
 ];
