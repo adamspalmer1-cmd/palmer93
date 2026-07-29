@@ -15,10 +15,22 @@ no wallet custody, and no portfolio management, by design.
   recovery, deduplicated historical snapshots with range-based retrieval, a
   `/admin/health` dashboard, an eight-check data-quality validation service,
   and a reusable, independently-testable service layer.
+- **Phase 2 — AI Opportunity Engine** analyzes active markets with Claude,
+  producing an immutable, versioned research record per analysis: a
+  fair-probability range, a deterministic Opportunity Score (never
+  self-graded by the model), evidence with independent duplicate/
+  credibility handling, resolution-risk assessment, and a mandatory
+  self-critique. Surfaced via a sortable/filterable Opportunity Scanner, a
+  market-detail analysis panel with a fair-value chart overlay, and an
+  admin cost/latency/reliability dashboard. Still not a trading bot: no
+  orders, no automatic trades, no "Daily Top 10" report yet (Phase 3,
+  pending approval). See [`AI_ENGINE.md`](./AI_ENGINE.md) for the full
+  design.
 
 See [`docs/`](./docs) for the full architecture, tech stack, database schema,
 API integration plan, security model, wireframes, roadmap, and (Phase 1.5)
-the per-job data pipeline reference.
+the per-job data pipeline reference. See [`AI_ENGINE.md`](./AI_ENGINE.md)
+and its linked documents for the Phase 2 AI Opportunity Engine specifically.
 
 ## Stack
 
@@ -48,6 +60,11 @@ cp .env.example .env.local
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase project settings → API (keep secret) |
 | `ANTHROPIC_API_KEY` | console.anthropic.com |
 | `CRON_SECRET` | Any random string — protects every ingestion/cron endpoint |
+
+The AI Opportunity Engine's cost/eligibility limits (max markets per run,
+daily spend cap, liquidity/spread thresholds, reanalysis cooldown, model
+token pricing) are also environment-configurable, with sane defaults —
+see [`COST_CONTROLS.md`](./COST_CONTROLS.md) for the full list.
 
 ### 3. Set up the database
 
@@ -96,7 +113,8 @@ curl -X POST http://localhost:3000/api/ingest/markets \
 ```
 
 In production, `vercel.json` configures Vercel Cron to call `sync-markets`
-and `refresh-order-books` every 5 minutes and `archive-markets` hourly.
+and `refresh-order-books` every 5 minutes, `archive-markets` hourly, and
+`analyze-markets` (below) hourly.
 
 ### 6. Check pipeline health
 
@@ -104,6 +122,34 @@ Sign in and visit `/admin/health` for cron status, database health,
 data-quality warnings, error history, and market metrics. Any signed-in
 user can view it — Phase 1 intentionally has no admin/role system yet (see
 `docs/07-security.md`).
+
+### 7. Run the AI Opportunity Engine
+
+Requires `ANTHROPIC_API_KEY`. Trigger a batch analysis run manually:
+
+```bash
+curl -X POST http://localhost:3000/api/cron/analyze-markets \
+  -H "x-ingest-secret: <your CRON_SECRET>"
+
+# Retry just the markets that failed in a prior run:
+curl -X POST "http://localhost:3000/api/cron/analyze-markets?resumeFromRunId=<id>" \
+  -H "x-ingest-secret: <your CRON_SECRET>"
+```
+
+Or trigger a single market on demand (signed-in user, from the app or
+directly):
+
+```bash
+curl -X POST http://localhost:3000/api/markets/<market-id>/analysis \
+  -H "Cookie: <your session cookie>"
+```
+
+Then sign in and visit `/scanner` (ranked, filterable analyses) or a
+market's detail page (full analysis + fair-value chart overlay), and
+`/admin/ai-engine` for cost/latency/reliability metrics. See
+[`AI_ENGINE.md`](./AI_ENGINE.md) for the full pipeline and
+[`COST_CONTROLS.md`](./COST_CONTROLS.md) for the budget limits that keep
+this from running away.
 
 ## Scripts
 
@@ -124,24 +170,35 @@ full layout and rationale. Highlights:
 - `src/app/(marketing)` — public landing page
 - `src/app/(auth)` — sign in / sign up
 - `src/app/(dashboard)` — dashboard shell, markets, categories, market
-  detail, watchlist, admin health dashboard (markets/categories are
-  publicly browsable; the dashboard overview, watchlist, and health
-  dashboard require sign-in)
-- `src/app/api/cron/*` — the three background jobs (Phase 1.5); `src/app/api/ingest/markets` runs all three in sequence
-- `src/app/api/markets/[id]` — price history and Claude analysis routes
+  detail (now with the AI analysis panel + fair-value chart overlay),
+  watchlist, opportunity scanner, admin health + AI engine ops dashboards
+  (markets/categories are publicly browsable; the dashboard overview,
+  watchlist, scanner, and admin pages require sign-in)
+- `src/app/api/cron/*` — the four background jobs (sync-markets,
+  refresh-order-books, archive-markets from Phase 1.5; analyze-markets
+  from Phase 2); `src/app/api/ingest/markets` runs the first three in sequence
+- `src/app/api/markets/[id]/analysis` — on-demand AI Opportunity Engine
+  trigger (Phase 2); `src/app/api/markets/[id]/analyze` is the earlier,
+  still-present Phase 1 single-signal route
 - `src/lib/services` — reusable, independently-testable data services
   (markets, events, categories, price history, order books, charts, sync
-  orchestration, data quality, market stats) — see `docs/05-api-integration.md` § 5.7
+  orchestration, data quality, market stats from Phase 1.5; analysis
+  eligibility/context/persistence/runs, reanalysis, opportunity scanner,
+  analysis detail, and AI engine metrics from Phase 2) — see
+  `docs/05-api-integration.md` § 5.7
 - `src/lib/sync` — retry/backoff (`retry.ts`) and cron authorization
 - `src/lib/polymarket` — Gamma/CLOB API clients and normalization
 - `src/lib/supabase` — browser/server/admin Supabase clients
-- `src/lib/ai` — Claude API integration
+- `src/lib/ai` — the AI Opportunity Engine: structured-output schema +
+  validation, deterministic opportunity scoring, evidence pipeline, cost
+  controls, the Claude call itself, and the single-market/batch
+  orchestrators — see [`AI_ENGINE.md`](./AI_ENGINE.md)
 - `supabase/migrations` — versioned SQL schema + RLS policies
 - `tests/helpers/fake-supabase.ts` — in-memory Supabase query-builder stand-in used to unit test the service layer
 
 ## Status
 
-Phase 1.5 (this repository) is feature-complete: tests, lint, typecheck, and
+Phase 2 (this repository) is feature-complete: tests, lint, typecheck, and
 production build all pass. Per the project brief, work stops here pending
-approval before starting the AI Opportunity Engine (see
+approval before starting the Daily Top 10 report (Phase 3, see
 [`docs/09-roadmap.md`](./docs/09-roadmap.md)).

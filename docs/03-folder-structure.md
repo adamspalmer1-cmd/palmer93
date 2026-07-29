@@ -129,3 +129,50 @@ src/
     ├── helpers/fake-supabase.ts           # in-memory Supabase query-builder stand-in for unit testing the service layer
     └── unit/*.test.ts                     # retry, dedup, data-quality, market-stats, sync orchestration, etc.
 ```
+
+## Phase 2 additions
+
+The AI Opportunity Engine — see [`AI_ENGINE.md`](../AI_ENGINE.md) for the
+design, this is just the file map:
+
+```
+src/
+├── app/
+│   ├── (dashboard)/
+│   │   ├── scanner/page.tsx               # /scanner — sortable/filterable ranked analyses
+│   │   └── admin/ai-engine/page.tsx       # /admin/ai-engine — cost, latency, failure-rate, skip reasons
+│   └── api/
+│       ├── markets/[id]/analysis/route.ts # on-demand trigger (signed-in) + latest-analysis read
+│       └── cron/analyze-markets/route.ts  # batch trigger (CRON_SECRET-gated), optional resumeFromRunId
+├── components/
+│   ├── markets/
+│   │   ├── analysis-panel.tsx             # full analysis: scores, bull/bear, evidence, catalysts, self-critique
+│   │   ├── analysis-badges.tsx            # shared RecommendationBadge / ResolutionRiskBadge
+│   │   ├── run-analysis-button.tsx        # signed-in-only trigger, refreshes the RSC page on success
+│   │   └── price-chart.tsx                # extended with an optional fair-value overlay series (Phase 1.5 base)
+│   └── scanner/                           # view-tabs, filter bar, header row, row renderer
+├── config/
+│   └── scanner-views.ts                   # named default views (Top Opportunities, Worth Watching, ...)
+├── lib/
+│   ├── ai/
+│   │   ├── analysis-schema.ts             # structured-output Zod schema + validateAnalysisOutput
+│   │   ├── opportunity-scoring.ts         # deterministic Opportunity Score formula
+│   │   ├── evidence-pipeline.ts           # duplicate detection + prompt-injection scanning
+│   │   ├── cost-controls.ts               # budget/eligibility config
+│   │   ├── analysis-model.ts              # the Claude call (prompts, tools, pause_turn, refusal, retry)
+│   │   ├── analyze-market.ts              # single-market pipeline orchestrator
+│   │   └── batch-engine.ts                # batch orchestrator (concurrency, budget stop, resume)
+│   ├── services/                          # Phase 2 additions to the existing service layer
+│   │   ├── analysis-eligibility.service.ts
+│   │   ├── reanalysis.service.ts
+│   │   ├── analysis-context.service.ts
+│   │   ├── analysis-persistence.service.ts
+│   │   ├── analysis-detail.service.ts
+│   │   ├── analysis-runs.service.ts
+│   │   ├── opportunity-scanner.service.ts
+│   │   └── ai-engine-metrics.service.ts
+│   ├── queries/                           # request-scoped wrappers: opportunities.ts, analysis-detail.ts, ai-engine-metrics.ts
+│   └── validation/scanner-filters.ts
+├── supabase/migrations/0007_ai_opportunity_engine.sql
+└── tests/unit/                            # one test file per lib/ai + Phase 2 lib/services file — see ../TESTING.md
+```
