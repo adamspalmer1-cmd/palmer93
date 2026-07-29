@@ -10,6 +10,7 @@ import {
   buildAnalysisSystemPrompt,
   runAnalysisModelCall,
   type AnalysisModelInput,
+  type AnalysisUsage,
 } from "@/lib/ai/analysis-model";
 import { runEvidencePipeline } from "@/lib/ai/evidence-pipeline";
 import { computeOpportunityScore } from "@/lib/ai/opportunity-scoring";
@@ -34,11 +35,11 @@ export interface RunSingleMarketAnalysisOptions {
 }
 
 export type SingleAnalysisOutcome =
-  | { status: "ok"; analysis: Analysis }
+  | { status: "ok"; analysis: Analysis; usage: AnalysisUsage }
   | { status: "skipped"; reason: string }
-  | { status: "refused"; message: string }
-  | { status: "invalid_output"; errors: string[] }
-  | { status: "error"; error: string };
+  | { status: "refused"; message: string; usage: AnalysisUsage }
+  | { status: "invalid_output"; errors: string[]; usage: AnalysisUsage }
+  | { status: "error"; error: string; usage?: AnalysisUsage };
 
 export async function runSingleMarketAnalysis(
   db: Db,
@@ -77,7 +78,7 @@ export async function runSingleMarketAnalysis(
 
   if (result.status === "refused") {
     await recordAnalysisFailure(db, { runId, marketId: market.id, stage: "model_call", error: result.message, retryable: false });
-    return { status: "refused", message: result.message };
+    return { status: "refused", message: result.message, usage: result.usage };
   }
 
   if (result.status === "invalid_output") {
@@ -88,7 +89,7 @@ export async function runSingleMarketAnalysis(
       error: result.errors.join("; ") || "Invalid structured output",
       retryable: false,
     });
-    return { status: "invalid_output", errors: result.errors };
+    return { status: "invalid_output", errors: result.errors, usage: result.usage };
   }
 
   const output = result.output;
@@ -126,10 +127,10 @@ export async function runSingleMarketAnalysis(
       promptTemplate: buildAnalysisSystemPrompt(),
       marketSnapshot: { market, pricing: input.pricing },
     });
-    return { status: "ok", analysis };
+    return { status: "ok", analysis, usage: result.usage };
   } catch (error) {
     const message = (error as Error).message;
     await recordAnalysisFailure(db, { runId, marketId: market.id, stage: "persistence", error: message, retryable: true });
-    return { status: "error", error: message };
+    return { status: "error", error: message, usage: result.usage };
   }
 }
