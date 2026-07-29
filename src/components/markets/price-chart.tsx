@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   createChart,
   AreaSeries,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
   type UTCTimestamp,
@@ -25,10 +26,22 @@ interface PricePoint {
   value: number;
 }
 
-export function PriceChart({ marketId, initialPoints }: { marketId: string; initialPoints: PricePoint[] }) {
+interface PriceChartProps {
+  marketId: string;
+  initialPoints: PricePoint[];
+  /**
+   * Claude's fair-value estimate (base case) at each historical analysis,
+   * rendered as a second, distinctly-styled/labeled series — never merged
+   * with or mistaken for the actual market price series.
+   */
+  fairValuePoints?: PricePoint[];
+}
+
+export function PriceChart({ marketId, initialPoints, fairValuePoints = [] }: PriceChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Area"> | null>(null);
+  const fairValueSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
   const [range, setRange] = useState<HistoryRange>("7d");
   const [loading, setLoading] = useState(false);
 
@@ -62,13 +75,24 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
       priceFormat: { type: "custom", formatter: (v: number) => `${Math.round(v * 100)}%` },
     });
 
+    const fairValueSeries = chart.addSeries(LineSeries, {
+      color: "#f5a623",
+      lineWidth: 2,
+      lineStyle: 2, // dashed — visually distinct from the solid market-price area
+      pointMarkersVisible: true,
+      priceFormat: { type: "custom", formatter: (v: number) => `${Math.round(v * 100)}%` },
+      title: "Claude fair value",
+    });
+
     chartRef.current = chart;
     seriesRef.current = series;
+    fairValueSeriesRef.current = fairValueSeries;
 
     return () => {
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      fairValueSeriesRef.current = null;
     };
   }, []);
 
@@ -78,6 +102,13 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
     seriesRef.current.setData(data);
     chartRef.current?.timeScale().fitContent();
   }, [initialPoints]);
+
+  useEffect(() => {
+    if (!fairValueSeriesRef.current) return;
+    const data = fairValuePoints.map((p) => ({ time: p.time as UTCTimestamp, value: p.value }));
+    fairValueSeriesRef.current.setData(data);
+    if (data.length > 0) chartRef.current?.timeScale().fitContent();
+  }, [fairValuePoints]);
 
   async function handleRangeChange(nextRange: HistoryRange) {
     setRange(nextRange);
@@ -95,7 +126,7 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex gap-1">
           {RANGES.map((r) => (
             <button
@@ -110,7 +141,19 @@ export function PriceChart({ marketId, initialPoints }: { marketId: string; init
             </button>
           ))}
         </div>
-        {loading && <span className="text-xs text-muted">Loading…</span>}
+        <div className="flex items-center gap-3 text-xs text-muted">
+          {fairValuePoints.length > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-3 rounded-full bg-accent" /> Market price
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-0.5 w-3 rounded-full bg-[#f5a623]" /> Claude fair value estimate
+              </span>
+            </div>
+          )}
+          {loading && <span>Loading…</span>}
+        </div>
       </div>
       <div ref={containerRef} className="h-72 w-full" />
     </div>

@@ -5,10 +5,11 @@ import { ArrowLeft, ArrowUp, ArrowDown } from "lucide-react";
 import { getMarketBySlug } from "@/lib/queries/markets";
 import { createClient } from "@/lib/supabase/server";
 import { getMarketPriceSeries } from "@/lib/services/charts.service";
+import { getLatestFullAnalysis, getAnalysisHistory } from "@/lib/queries/analysis-detail";
 import { formatCompactUsd, formatSignedPercent, cn } from "@/lib/utils";
 import { ProbabilityPill } from "@/components/markets/probability-pill";
 import { PriceChart } from "@/components/markets/price-chart";
-import { AiSignalPanel } from "@/components/markets/ai-signal-panel";
+import { AnalysisPanel } from "@/components/markets/analysis-panel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCategory } from "@/config/categories";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +35,16 @@ export default async function MarketDetailPage({ params }: MarketDetailPageProps
   } = await supabase.auth.getUser();
 
   const tokenId = market.clob_token_ids?.[0];
-  const initialPoints = tokenId ? await getMarketPriceSeries(supabase, market.id, tokenId, "7d") : [];
+  const [initialPoints, fullAnalysis, analysisHistory] = await Promise.all([
+    tokenId ? getMarketPriceSeries(supabase, market.id, tokenId, "7d") : Promise.resolve([]),
+    getLatestFullAnalysis(market.id),
+    getAnalysisHistory(market.id),
+  ]);
+
+  const fairValuePoints = analysisHistory.map((h) => ({
+    time: Math.floor(new Date(h.analyzedAt).getTime() / 1000),
+    value: h.fairProbabilityBase,
+  }));
 
   const category = market.category_id ? getCategory(market.category_id) : undefined;
   const change = market.price_change_24h ?? 0;
@@ -70,39 +80,42 @@ export default async function MarketDetailPage({ params }: MarketDetailPageProps
 
       <Card>
         <CardContent>
-          <PriceChart marketId={market.id} initialPoints={initialPoints} />
+          <PriceChart marketId={market.id} initialPoints={initialPoints} fairValuePoints={fairValuePoints} />
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Market details</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted">Resolution date</span>
-              <span className="text-foreground">
-                {market.end_date ? new Date(market.end_date).toLocaleDateString() : "—"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted">Status</span>
-              <span className="text-foreground">{market.closed ? "Closed" : "Active"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted">Outcomes</span>
-              <span className="text-foreground">
-                {Array.isArray(market.outcomes)
-                  ? (market.outcomes as { name?: string }[]).map((o) => o.name).join(" / ")
-                  : "—"}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Market details</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted">Resolution date</span>
+            <span className="text-foreground">
+              {market.end_date ? new Date(market.end_date).toLocaleDateString() : "—"}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">Status</span>
+            <span className="text-foreground">{market.closed ? "Closed" : "Active"}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted">Outcomes</span>
+            <span className="text-foreground">
+              {Array.isArray(market.outcomes)
+                ? (market.outcomes as { name?: string }[]).map((o) => o.name).join(" / ")
+                : "—"}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
-        <AiSignalPanel marketId={market.id} isAuthenticated={Boolean(user)} />
-      </div>
+      <AnalysisPanel
+        marketId={market.id}
+        fullAnalysis={fullAnalysis}
+        history={analysisHistory}
+        isAuthenticated={Boolean(user)}
+      />
     </div>
   );
 }
