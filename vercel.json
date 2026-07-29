@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/archive-markets",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/analyze-markets",
+      "schedule": "0 * * * *"
     }
   ]
 }
